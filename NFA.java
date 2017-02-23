@@ -7,9 +7,9 @@ public class NFA{
 	ArrayList<String> transFunction = new ArrayList<String>();
 	//transitions as States
 	ArrayList<State> transFStates = new ArrayList<State>();
-	String start;
+	int start;
 
-	ArrayList<String> startPrime = new ArrayList<String>();
+	ArrayList<Integer> qPrime = new ArrayList<>();
 
 	public static void main(String[] args){
 
@@ -17,8 +17,8 @@ public class NFA{
 		ex.readFile("example.txt");
 
 		ex.convertToStates();
-		// printList(ex.alphabet);
-		// printArray(ex.transFunction);
+		ex.getQPrime();
+
 
 	}
 
@@ -34,8 +34,8 @@ public class NFA{
 
 			this.states = (fullFile.get(0)).toString().split("\t");
 			this.alphabet = (fullFile.get(1)).toString().split("\t");
-			this.start = fullFile.get(2).toString();
-			this.start = this.start.replaceAll("[^\\d.]", "");
+		 	String startS = fullFile.get(2).toString();
+			this.start = Integer.parseInt(startS.replaceAll("[^\\d.]", ""));
 			this.acceptStates = (fullFile.get(3)).toString().split("\t");
 
 			//line 5 to EOF is transition function
@@ -78,8 +78,29 @@ public class NFA{
 			//split equation into current state, symbol, end state
 			function = currentFunc.split("[,=]");
 
-			adding = new State(Integer.parseInt(function[0]), function[1], Integer.parseInt(function[2].replaceAll("\\s+","")));
+			adding = new State(Integer.parseInt(function[0]), function[1].replaceAll("\\s+",""), Integer.parseInt(function[2].replaceAll("\\s+","")));
 			transFStates.add(adding);
 		}
+	}
+
+	public void getQPrime(){
+		State currentS;
+		//start state of original NFA is always in q prime
+		this.qPrime.add(this.start);
+
+		//add states that are reached by an EPS
+		for(int q=0; q<transFStates.size(); ++q){
+			currentS = transFStates.get(q);
+
+			//if this trans function contains an eps, add end state to q prime
+			if(currentS.symbol.equals("EPS")){
+				this.qPrime.add(currentS.endState);
+			}
+
+		}
+	}
+
+	public void deltaPrime(){
+
 	}
 }
