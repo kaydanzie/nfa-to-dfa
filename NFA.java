@@ -13,7 +13,8 @@ public class NFA{
 	//create hashmap of hashmaps
 	//{ q1:{"a":2,"b":1}, q2:{"a":2} }
 	//states have been stripped of non-numeric characters (Integer)
-	HashMap<Integer, HashMap<String, Integer[]>> hmap = new HashMap<Integer, HashMap<String, Integer>>();
+	//change Integer to []?
+	HashMap<Integer, HashMap<String, Integer>> hmap = new HashMap<Integer, HashMap<String, Integer>>();
 
 	ArrayList<Integer> qPrime = new ArrayList<>();
 
@@ -23,12 +24,12 @@ public class NFA{
 	public static void main(String[] args){
 
 		NFA ex = new NFA();
-		ex.readFile("example.txt");
+		ex.readFile("nfa_example.nfa");
 
 		ex.convertToStates();
 		ex.getQPrime();
 		ex.acceptableStates();
-		ex.getEndStates();
+		//ex.getEndStates();
 
 	}
 
@@ -42,16 +43,27 @@ public class NFA{
 				fullFile.add(line);
 			}
 
-			this.states = (fullFile.get(0)).toString().split("\t");
-			this.alphabet = (fullFile.get(1)).toString().split("\t");
-		 	String startS = fullFile.get(2).toString();
-			this.start = Integer.parseInt(startS.replaceAll("[^\\d.]", ""));
-			this.acceptStates = (fullFile.get(3)).toString().split("\t");
+			String temp;
+			//line 1, all states
+			temp = (fullFile.get(0)).toString();
+			this.states = temp.replaceAll("\\p{P}", "").split("\\s+");
+
+			//line 2, alphabet/all symbols
+			temp = (fullFile.get(1)).toString();
+			this.alphabet = temp.replaceAll("\\p{P}", "").split("\\s+");
+
+			//line 3, start states
+		 	temp = fullFile.get(2).toString();
+			this.start = Integer.parseInt(temp.replaceAll("\\p{P}", ""));
+
+			//line 4, accept states
+			temp = (fullFile.get(3)).toString();
+			this.acceptStates = (temp.replaceAll("\\p{P}", "")).split("\\s+");
 
 			//line 5 to EOF is transition function
 			for(int i=4; i<fullFile.size(); ++i){
 				//each row after 5 is an equation s,x = s^f
-				transFunction.add(fullFile.get(i));
+				transFunction.add(fullFile.get(i).replaceAll("[{}\\s+]", ""));
 			}
 
 			buff.close();
@@ -106,6 +118,7 @@ public class NFA{
 
 			//if this trans function contains an eps, add end state to q prime
 			if(currentS.symbol.equals("EPS")){
+				print(currentS.endState);
 				this.qPrime.add(currentS.endState);
 			}
 		}
@@ -152,12 +165,12 @@ public class NFA{
 	}
 
 	//given state and letter, get end state
-	public getEndStates(State startS, String letter){
+	// public getEndStates(State startS, String letter){
+	//
+	// }
 
-	}
+	public void iterateHash(HashMap<String, Integer> iMap){
 
-	public String[] iterateHash(HashMap<String, Integer> iMap){
-		//one state has mult
 		ArrayList<String> returnString = new ArrayList<String>();
 
 		for(int i=0; i<alphabet.length; ++i){
@@ -169,7 +182,7 @@ public class NFA{
 			}
 		}
 
-		return returnString;
+		//return returnString;
 	}
 
 }
