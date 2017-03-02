@@ -2,34 +2,48 @@ import java.io.*;
 import java.util.*;
 
 public class NFA{
+
+	//Filled from input file in method readFile:
 	String[] states, alphabet, acceptStates;
-	//transition functions direct from file
+	int start;
+	//transition functions direct from file, with brackets / whitespace / other characters
 	ArrayList<String> transFunction = new ArrayList<String>();
 
 	//transitions as States, line 5 to EOF
+	//initialized in method convertToStates:
 	ArrayList<State> transFStates = new ArrayList<State>();
-	int start;
-	Stack endStack;
 
-	//create hashmap of hashmaps
-	//{ q1:{"a":2,"b":1}, q2:{"a":2} }
-	//states have been stripped of non-numeric characters (Integer)
-	//change Integer to []?
+	//stack of end states that need to be in the final output
+	//continuously popped and pushed
+	//initialized in method getEndStates:
+	Stack endStack = new Stack<ArrayList<Integer>>();
+
+	//create hashmap of hashmaps { q1:{"a":2,"b":1}, q2:{"a":2} }
+	//states have been stripped of non-numeric characters
+	//initialized in method acceptableStates:
 	HashMap<Integer, HashMap<String, ArrayList<Integer>>> hmap = new HashMap<Integer, HashMap<String, ArrayList<Integer>>>();
 
+	//initialized in method getQPrime:
 	ArrayList<Integer> qPrime = new ArrayList<>();
 
-	//create arraylist of strings (transition functions for dfa) to put in output file
-	ArrayList<String> dfaTransitions = new ArrayList<String>();
+	//filled in getEndStates:
+	ArrayList<DFAState> dfaStates = new ArrayList<DFAState>();
+
+	ArrayList<String> finalFunctions = new ArrayList<String>();
+
 
 	public static void main(String[] args){
 
 		NFA ex = new NFA();
-		ex.readFile("nfa_example.nfa");
+		//ex.readFile("nfa_example.nfa");
+		ex.readFile("example.txt");
 
 		ex.convertToStates();
 		ex.getQPrime();
 		ex.acceptableStates();
+		ex.fillEmptySets();
+		ex.getEndStates();
+		ex.fillFinalStrings();
 
 	}
 
@@ -94,7 +108,6 @@ public class NFA{
 		State adding;
 		String currentFunc;
 		String[] function;
-		ArrayList<Integer> allEndStates; //all end states for one letter/symbol, same start state
 
 		for(int i=0; i<this.transFunction.size(); ++i){
 			currentFunc = transFunction.get(i);
@@ -102,9 +115,7 @@ public class NFA{
 			//split equation into current state, symbol, end state
 			function = currentFunc.split("[,=]");
 
-
-
-			//convert function items to format (int, String, int)
+			//convert function items to State class format State(int, String, int)
 			adding = new State(Integer.parseInt(function[0]), function[1], Integer.parseInt(function[2]));
 			transFStates.add(adding);
 		}
@@ -207,46 +218,147 @@ public class NFA{
 	}
 
 
+	//get arraylist of end states given start state and letter
+	public ArrayList<Integer> getFromHash(int s, String letter){
+		for(int i=0; i<this.states.length; ++i){
+			HashMap<String, ArrayList<Integer>> t = hmap.get(s);
+			if(t.get(letter) != null) return t.get(letter);
+			else return null;
+		}
+		return null;
+	}
+
 	//given state and letter, get end states (arraylist)
-	// public getEndStates(State startS, String letter){
-	// 	for(int j=0; j<qPrime.size(); ++j){
-	// 		endStack.push(transFStates.get(qPrime.get(j).end))
-	// 	}
-	// 	endStack.push()
-	// 	while(!endStack.empty()){
-	//
-	// 	}
-	// }
+	public void getEndStates(){
+		ArrayList<Integer> combinedEndStates, currentStarts, oneEndStates;
+		DFAState tempDFA;
 
-	// public void getEndStates(){
-	// 	int currentState;
-	// 	//one function can have multiple start states
-	// 	// {1,3}, a = {1,3}
-	// 	ArrayList<String> oneFunction = new ArrayList<String>();
-	// 	//HashMap<String, Integer> allMappedStates;
-	//
-	// 	for(int i=0; i< qPrime.size(); ++i){
-	// 		currentState = qPrime.get(i);
-	// 		//oneFunction = iterateHash(transFStates.get(currentState));
-	// 		iterateHash(hmap.get(currentState));
-	//
-	// 	}
-	// }
+		//start stack with qprime, pop end states, get end states of those, push them
+		for(int j=0; j<this.alphabet.length; ++j){
+			combinedEndStates = new ArrayList<Integer>();
+			currentStarts = new ArrayList<Integer>();
 
-	public void iterateHash(HashMap<String, Integer> iMap){
+			//for each letter, combine end states of q prime states
+			for(int k=0; k<this.qPrime.size(); ++k){
 
-		ArrayList<String> returnString = new ArrayList<String>();
-
-		for(int i=0; i<alphabet.length; ++i){
-			if(iMap.containsKey(alphabet[i])){
-				returnString.add((iMap.get(alphabet[i])).toString());
+				print("q prime: "+ this.qPrime.get(k)+ ", letter: "+ this.alphabet[j]);
+				ArrayList<Integer> endStates = getFromHash(this.qPrime.get(k), this.alphabet[j]);
+				currentStarts.add(this.qPrime.get(k));
+				// print("current end states: ");
+				// print(endStates == null);
+				if(!(endStates == null)) combinedEndStates = combineArrays(endStates, combinedEndStates);
 			}
-			else{
-				returnString.add("EM");
-			}
+
+			tempDFA = new DFAState(currentStarts, this.alphabet[j], combinedEndStates);
+			//each letter gets pushed, after iterating through all q prime states
+			this.endStack.push(combinedEndStates);
 		}
 
-		//return returnString;
+
+		//stack of end states, which then used as start states
+		while(!endStack.empty()){
+			currentStarts = (ArrayList<Integer>) endStack.pop();
+
+			//all end states for one state
+			oneEndStates = new ArrayList<Integer>();
+
+			//check if class variable dfaStates contains this exact set of start states
+			if(!containsStarts(currentStarts)){
+				for(int i=0; i<this.alphabet.length; ++i){
+					//each letter has different combined end states
+					combinedEndStates = new ArrayList<Integer>();
+
+					for(int j=0; j<currentStarts.size(); ++j){
+						//end states for this one letter and state, replace with each loop
+						//need to get state object from transFStates
+						print(currentStarts.get(j));
+						oneEndStates = getFromHash(currentStarts.get(j), this.alphabet[i]);
+						if(!(oneEndStates == null)) combinedEndStates = combineArrays(oneEndStates, combinedEndStates);
+					}
+					//don't do this here
+					//formatFunctions(currentStarts, this.alphabet[i], combinedEndStates);
+					tempDFA = new DFAState(currentStarts, this.alphabet[i], combinedEndStates);
+					dfaStates.add(tempDFA);
+					this.endStack.push(combinedEndStates);
+				}
+
+			}
+			//else start states have already been checked
+
+
+		}
+	}
+
+	public boolean containsStarts(ArrayList<Integer> find){
+		//compare start state arraylists of all dfas to find
+		DFAState tempDFA;
+
+		for(int h=0; h<this.dfaStates.size(); ++h){
+			tempDFA = this.dfaStates.get(h);
+			int matching = 0;
+			for(int starts : tempDFA.startStates){
+				if(find.contains(starts)) matching++;
+			}
+			//if all ints matched, return true
+			//else go to next dfa in list
+			if(matching == tempDFA.startStates.size()) return true;
+		}
+		return false;
+	}
+
+	public String formatFunctions(ArrayList<Integer> startStates, String letter, ArrayList<Integer> endStates){
+		String returnString = "{";
+
+		for(int i=0; i<startStates.size(); ++i){
+			returnString += (startStates.get(i) + ", ");
+		}
+
+		returnString += ("} , " + letter + " = {");
+
+		for(int i=0; i<endStates.size(); ++i){
+			returnString += (endStates.get(i) + ", ");
+		}
+
+		return returnString+ "}";
+	}
+
+
+	public void fillEmptySets(){
+		//alphabet and end states for one state
+		HashMap<String, ArrayList<Integer>> oneState;
+
+		for(int r=0; r<this.states.length; ++r){
+			//get each inner hash of symbols/end states
+			oneState = this.hmap.get(Integer.parseInt(this.states[r]));
+			for(int a=0; a<this.alphabet.length; ++a){
+				if(!oneState.containsKey(this.alphabet[a])){
+					//if letter doesn't exist for state, enter as null
+					//"b" : null
+					oneState.put(this.alphabet[a], null);
+				}
+			}
+			//change value for this state so it's hash now includes all letters
+			//might not change, might just be putting back original
+			this.hmap.put(Integer.parseInt(this.states[r]), oneState);
+		}
+	}
+
+
+	public void fillFinalStrings(){
+		DFAState tempDFA;
+		String t;
+		for(int p=0; p<this.dfaStates.size(); ++p){
+			tempDFA = this.dfaStates.get(p);
+			t = formatFunctions(tempDFA.startStates, tempDFA.symbol, tempDFA.endStates);
+			print(t);
+			finalFunctions.add(t);
+		}
+	}
+
+
+	public ArrayList<Integer> combineArrays(ArrayList<Integer> smallerSet, ArrayList<Integer> allCombined){
+		for(int k=0; k<smallerSet.size(); ++k) allCombined.add(smallerSet.get(k));
+		return allCombined;
 	}
 
 
