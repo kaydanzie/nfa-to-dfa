@@ -10,19 +10,4 @@ public class DFAState {
     this.endStates = endStates;
   }
 
-  public String printDFA(){
-    String returnString = "{";
-
-    for(int i=0; i<startStates.size(); ++i){
-      returnString += (startStates.get(i) + ", ");
-    }
-
-    returnString += ("} , " + letter + " = {");
-
-    for(int i=0; i<endStates.size(); ++i){
-      returnString += (endStates.get(i) + ", ");
-    }
-
-    return returnString+ "}";
-  }
 }

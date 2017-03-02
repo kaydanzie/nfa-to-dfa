@@ -35,8 +35,8 @@ public class NFA{
 	public static void main(String[] args){
 
 		NFA ex = new NFA();
-		//ex.readFile("nfa_example.nfa");
-		ex.readFile("example.txt");
+		ex.readFile("nfa_example.nfa");
+		//ex.readFile("example.txt");
 
 		ex.convertToStates();
 		ex.getQPrime();
@@ -99,7 +99,7 @@ public class NFA{
 
 	public static void printArray(ArrayList arr){
 		for(int i=0; i< arr.size(); ++i){
-			print(arr.get(i));
+			System.out.print(arr.get(i)+ " ");
 		}
 	}
 
@@ -147,51 +147,52 @@ public class NFA{
 		int tempStateNum;
 		State tempCurrent;
 
+		//initialize empty hashmap so every key at least exists, don't need to check
+		for(int k=0; k<this.states.length; ++k){
+			this.hmap.put(Integer.parseInt(this.states[k]), new HashMap<String, ArrayList<Integer>>());
+		}
+
 		//go through states, adding each one by one to hmap as keys
 		for(int i=0; i<this.states.length; ++i){
-			//accept states differ by state, needs to be reset
-			acceptedStates = new HashMap<String, ArrayList<Integer>>();
 
+			//current state being "added" as key to hashmap
 			tempStateNum = Integer.parseInt(this.states[i]);
 
 			//every state needs to go through transFStates to see where every symbol goes
 			//transFStates is array of states, all rules that exist for the nfa
 			for(int j=0; j<this.transFStates.size(); ++j){
 
-				//either set it to new or getKey
+				//either set it to new or get key
 				ArrayList<Integer> putStates;
 
 				tempCurrent = this.transFStates.get(j);
 
 				//check if it's a rule for the state being checked in i loop, and not epsilon
-				if(tempCurrent.current == Integer.parseInt(this.states[i]) && !tempCurrent.symbol.equals("EPS")){
-					if(hmap.containsKey(tempStateNum)){
-						//format of temp- "a": [1,2]
-						HashMap<String, ArrayList<Integer>> temp = hmap.get(tempStateNum);
-						String tempLetter = tempCurrent.symbol;
+				if(tempCurrent.current == tempStateNum && !tempCurrent.symbol.equals("EPS")){
 
-						//modifying ArrayList<Integer> with put
-						//temp.get(tempLetter) is an ArrayList<Integer>
-						putStates = temp.get(tempLetter);
-						putStates.add(tempCurrent.endState);
-						acceptedStates.put(tempLetter, putStates);
+					HashMap<String, ArrayList<Integer>> temp = this.hmap.get(tempStateNum);
+
+					if(temp.containsKey(tempCurrent.symbol)){
+						putStates = temp.get(tempCurrent.symbol);
 					}
-
 					else{
 						putStates = new ArrayList<Integer>();
-						putStates.add(tempCurrent.endState);
-						acceptedStates.put(tempCurrent.symbol, putStates);
 					}
+
+					putStates.add(tempCurrent.endState);
+					temp.put(tempCurrent.symbol, putStates);
+					this.hmap.put(tempStateNum, temp);
+
 				}
 				else if((tempCurrent.current == Integer.parseInt(this.states[i])) && tempCurrent.symbol.equals("EPS")){
 					//need to check if the HashMap<String, ArrayList<Integer>> already has all symbols
 					//checkKey function adds EPS end state to letters in alphabet
+					acceptedStates = this.hmap.get(tempStateNum);
 					acceptedStates = checkKeys(acceptedStates, tempCurrent);
+					this.hmap.put(tempStateNum, acceptedStates);
 				}
-				//otherwise could be a rule for a different state
+				//otherwise a rule for a different state
 			}
-
-			this.hmap.put(tempStateNum, acceptedStates);
 
 		}
 	}
@@ -241,11 +242,8 @@ public class NFA{
 			//for each letter, combine end states of q prime states
 			for(int k=0; k<this.qPrime.size(); ++k){
 
-				print("q prime: "+ this.qPrime.get(k)+ ", letter: "+ this.alphabet[j]);
 				ArrayList<Integer> endStates = getFromHash(this.qPrime.get(k), this.alphabet[j]);
 				currentStarts.add(this.qPrime.get(k));
-				// print("current end states: ");
-				// print(endStates == null);
 				if(!(endStates == null)) combinedEndStates = combineArrays(endStates, combinedEndStates);
 			}
 
@@ -271,9 +269,11 @@ public class NFA{
 					for(int j=0; j<currentStarts.size(); ++j){
 						//end states for this one letter and state, replace with each loop
 						//need to get state object from transFStates
-						print(currentStarts.get(j));
 						oneEndStates = getFromHash(currentStarts.get(j), this.alphabet[i]);
 						if(!(oneEndStates == null)) combinedEndStates = combineArrays(oneEndStates, combinedEndStates);
+						print("");
+						printArray(combinedEndStates);
+						print("");
 					}
 					//don't do this here
 					//formatFunctions(currentStarts, this.alphabet[i], combinedEndStates);
@@ -310,7 +310,7 @@ public class NFA{
 		String returnString = "{";
 
 		for(int i=0; i<startStates.size(); ++i){
-			returnString += (startStates.get(i) + ", ");
+			returnString += (i == startStates.size()) ? (startStates.get(i)) : (startStates.get(i) + ", ");
 		}
 
 		returnString += ("} , " + letter + " = {");
@@ -357,7 +357,9 @@ public class NFA{
 
 
 	public ArrayList<Integer> combineArrays(ArrayList<Integer> smallerSet, ArrayList<Integer> allCombined){
-		for(int k=0; k<smallerSet.size(); ++k) allCombined.add(smallerSet.get(k));
+		for(int k=0; k<smallerSet.size(); ++k){
+			if(!allCombined.contains(smallerSet.get(k))) allCombined.add(smallerSet.get(k));
+		}
 		return allCombined;
 	}
 
