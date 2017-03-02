@@ -9,12 +9,13 @@ public class NFA{
 	//transitions as States, line 5 to EOF
 	ArrayList<State> transFStates = new ArrayList<State>();
 	int start;
+	Stack endStack;
 
 	//create hashmap of hashmaps
 	//{ q1:{"a":2,"b":1}, q2:{"a":2} }
 	//states have been stripped of non-numeric characters (Integer)
 	//change Integer to []?
-	HashMap<Integer, HashMap<String, Integer>> hmap = new HashMap<Integer, HashMap<String, Integer>>();
+	HashMap<Integer, HashMap<String, ArrayList<Integer>>> hmap = new HashMap<Integer, HashMap<String, ArrayList<Integer>>>();
 
 	ArrayList<Integer> qPrime = new ArrayList<>();
 
@@ -29,7 +30,6 @@ public class NFA{
 		ex.convertToStates();
 		ex.getQPrime();
 		ex.acceptableStates();
-		//ex.getEndStates();
 
 	}
 
@@ -94,14 +94,18 @@ public class NFA{
 		State adding;
 		String currentFunc;
 		String[] function;
+		ArrayList<Integer> allEndStates; //all end states for one letter/symbol, same start state
+
 		for(int i=0; i<this.transFunction.size(); ++i){
 			currentFunc = transFunction.get(i);
 
 			//split equation into current state, symbol, end state
 			function = currentFunc.split("[,=]");
 
+
+
 			//convert function items to format (int, String, int)
-			adding = new State(Integer.parseInt(function[0]), function[1].replaceAll("\\s+",""), Integer.parseInt(function[2].replaceAll("\\s+","")));
+			adding = new State(Integer.parseInt(function[0]), function[1], Integer.parseInt(function[2]));
 			transFStates.add(adding);
 		}
 	}
@@ -118,55 +122,115 @@ public class NFA{
 
 			//if this trans function contains an eps, add end state to q prime
 			if(currentS.symbol.equals("EPS")){
-				print(currentS.endState);
 				this.qPrime.add(currentS.endState);
 			}
 		}
 	}
 
-
+//filling hmap { q1:{"a":[2],"b":[1]}, q2:{"a":[2]} }
 	public void acceptableStates(){
 
 		//doesn't need to be a class variable
-		HashMap<String, Integer> acceptedStates;
+		//inner hashmap
+		HashMap<String, ArrayList<Integer>> acceptedStates;
+		int tempStateNum;
+		State tempCurrent;
 
+		//go through states, adding each one by one to hmap as keys
 		for(int i=0; i<this.states.length; ++i){
-			//accepted states differ by state, needs to be reset
-			acceptedStates = new HashMap<String, Integer>();
+			//accept states differ by state, needs to be reset
+			acceptedStates = new HashMap<String, ArrayList<Integer>>();
+
+			tempStateNum = Integer.parseInt(this.states[i]);
 
 			//every state needs to go through transFStates to see where every symbol goes
+			//transFStates is array of states, all rules that exist for the nfa
 			for(int j=0; j<this.transFStates.size(); ++j){
 
+				//either set it to new or getKey
+				ArrayList<Integer> putStates;
+
+				tempCurrent = this.transFStates.get(j);
+
 				//check if it's a rule for the state being checked in i loop, and not epsilon
-				if((this.transFStates.get(j).current == Integer.parseInt(this.states[i])) && !this.transFStates.get(j).symbol.equals("EPS")){
-					acceptedStates.put(this.transFStates.get(j).symbol, this.transFStates.get(j).endState);
-					//print(this.transFStates.get(j).symbol);
+				if(tempCurrent.current == Integer.parseInt(this.states[i]) && !tempCurrent.symbol.equals("EPS")){
+					if(hmap.containsKey(tempStateNum)){
+						//format of temp- "a": [1,2]
+						HashMap<String, ArrayList<Integer>> temp = hmap.get(tempStateNum);
+						String tempLetter = tempCurrent.symbol;
+
+						//modifying ArrayList<Integer> with put
+						//temp.get(tempLetter) is an ArrayList<Integer>
+						putStates = temp.get(tempLetter);
+						putStates.add(tempCurrent.endState);
+						acceptedStates.put(tempLetter, putStates);
+					}
+
+					else{
+						putStates = new ArrayList<Integer>();
+						putStates.add(tempCurrent.endState);
+						acceptedStates.put(tempCurrent.symbol, putStates);
+					}
 				}
+				else if((tempCurrent.current == Integer.parseInt(this.states[i])) && tempCurrent.symbol.equals("EPS")){
+					//need to check if the HashMap<String, ArrayList<Integer>> already has all symbols
+					//checkKey function adds EPS end state to letters in alphabet
+					acceptedStates = checkKeys(acceptedStates, tempCurrent);
+				}
+				//otherwise could be a rule for a different state
 			}
 
-			this.hmap.put(Integer.parseInt(this.states[i]), acceptedStates);
+			this.hmap.put(tempStateNum, acceptedStates);
 
 		}
 	}
 
-	public void getEndStates(){
-		int currentState;
-		//one function can have multiple start states
-		// {1,3}, a = {1,3}
-		ArrayList<String> oneFunction = new ArrayList<String>();
-		//HashMap<String, Integer> allMappedStates;
 
-		for(int i=0; i< qPrime.size(); ++i){
-			currentState = qPrime.get(i);
-			//oneFunction = iterateHash(transFStates.get(currentState));
-			iterateHash(hmap.get(currentState));
 
+	public HashMap<String, ArrayList<Integer>> checkKeys(HashMap<String, ArrayList<Integer>> accepted, State startState){
+
+		//all you need to do is add the end state of EPS start state to the existing list of reachable states for each symbol
+		for(int h=0; h<alphabet.length; ++h){
+			if(accepted.containsKey(alphabet[h])){
+				ArrayList<Integer> t = accepted.get(alphabet[h]);
+				t.add(startState.endState);
+				accepted.put(alphabet[h], t);
+			}
+			else{
+				ArrayList<Integer> t = new ArrayList<Integer>();
+				t.add(startState.endState);
+				accepted.put(alphabet[h], t);
+			}
 		}
+
+		return accepted;
 	}
 
-	//given state and letter, get end state
+
+	//given state and letter, get end states (arraylist)
 	// public getEndStates(State startS, String letter){
+	// 	for(int j=0; j<qPrime.size(); ++j){
+	// 		endStack.push(transFStates.get(qPrime.get(j).end))
+	// 	}
+	// 	endStack.push()
+	// 	while(!endStack.empty()){
 	//
+	// 	}
+	// }
+
+	// public void getEndStates(){
+	// 	int currentState;
+	// 	//one function can have multiple start states
+	// 	// {1,3}, a = {1,3}
+	// 	ArrayList<String> oneFunction = new ArrayList<String>();
+	// 	//HashMap<String, Integer> allMappedStates;
+	//
+	// 	for(int i=0; i< qPrime.size(); ++i){
+	// 		currentState = qPrime.get(i);
+	// 		//oneFunction = iterateHash(transFStates.get(currentState));
+	// 		iterateHash(hmap.get(currentState));
+	//
+	// 	}
 	// }
 
 	public void iterateHash(HashMap<String, Integer> iMap){
@@ -184,5 +248,6 @@ public class NFA{
 
 		//return returnString;
 	}
+
 
 }
