@@ -23,6 +23,9 @@ public class NFA{
 	//initialized in method acceptableStates:
 	HashMap<Integer, HashMap<String, ArrayList<Integer>>> hmap = new HashMap<Integer, HashMap<String, ArrayList<Integer>>>();
 
+	HashMap<Integer, HashMap<String, ArrayList<Integer>>> epsilons = new HashMap<Integer, HashMap<String, ArrayList<Integer>>>();
+
+
 	//initialized in method getQPrime:
 	ArrayList<Integer> qPrime = new ArrayList<>();
 
@@ -32,19 +35,23 @@ public class NFA{
 	ArrayList<String> finalFunctions = new ArrayList<String>();
 
 
-	public static void main(String[] args){
+	public static void main(String[] args) throws IOException{
 
 		NFA ex = new NFA();
-		//ex.readFile("nfa_example.nfa");
-		ex.readFile("example.txt");
+
+		Scanner reader = new Scanner(System.in);
+		print("Enter filename: ");
+		String filename = reader.next();
+
+		ex.readFile(filename);
 
 		ex.convertToStates();
 		ex.getQPrime();
 		ex.acceptableStates();
 		ex.fillEmptySets();
 		ex.getEndStates();
-		print(ex.hmap);
 		ex.fillFinalStrings();
+		ex.writeFile();
 
 	}
 
@@ -186,11 +193,16 @@ public class NFA{
 
 				}
 				else if((tempCurrent.current == Integer.parseInt(this.states[i])) && tempCurrent.symbol.equals("EPS")){
-					//need to check if the HashMap<String, ArrayList<Integer>> already has all symbols
-					//checkKey function adds EPS end state to letters in alphabet
-					acceptedStates = this.hmap.get(tempStateNum);
-					acceptedStates = checkKeys(acceptedStates, tempCurrent);
-					this.hmap.put(tempStateNum, acceptedStates);
+					//if this doesnt work try initializing empty
+					if(epsilons.containsKey(tempStateNum)){
+						acceptedStates = this.epsilons.get(tempStateNum);
+					}
+					else{
+						acceptedStates = new HashMap<String, ArrayList<Integer>>();
+					}
+
+					acceptedStates = expandEpsilon(acceptedStates, tempCurrent);
+					this.epsilons.put(tempCurrent.current, acceptedStates);
 				}
 				//otherwise a rule for a different state
 			}
@@ -198,12 +210,10 @@ public class NFA{
 		}
 	}
 
+	public HashMap<String, ArrayList<Integer>> expandEpsilon(HashMap<String, ArrayList<Integer>> accepted, State startState) {
 
-
-	public HashMap<String, ArrayList<Integer>> checkKeys(HashMap<String, ArrayList<Integer>> accepted, State startState){
-
-		//all you need to do is add the end state of EPS start state to the existing list of reachable states for each symbol
 		for(int h=0; h<alphabet.length; ++h){
+
 			if(accepted.containsKey(alphabet[h])){
 				ArrayList<Integer> t = accepted.get(alphabet[h]);
 				t.add(startState.endState);
@@ -215,7 +225,6 @@ public class NFA{
 				accepted.put(alphabet[h], t);
 			}
 		}
-
 		return accepted;
 	}
 
@@ -242,10 +251,29 @@ public class NFA{
 
 			//for each letter, combine end states of q prime states
 			for(int k=0; k<this.qPrime.size(); ++k){
-
-				ArrayList<Integer> endStates = getFromHash(this.qPrime.get(k), this.alphabet[j]);
+				ArrayList<Integer> endStates;
+				if(this.epsilons.containsKey(this.qPrime.get(k))){
+					endStates = getFromHash(this.qPrime.get(k), this.alphabet[j]);
+					ArrayList<Integer> epsilonStates = this.epsilons.get(this.qPrime.get(k)).get(this.alphabet[j]);
+					if(endStates == null){
+						endStates = epsilonStates;
+					}
+					else{
+						endStates = combineArrays(epsilonStates, endStates);
+					}
+				}
+				else {
+					endStates = getFromHash(this.qPrime.get(k), this.alphabet[j]);
+				}
 				currentStarts.add(this.qPrime.get(k));
-				if(!(endStates == null)) combinedEndStates = combineArrays(endStates, combinedEndStates);
+				if(!(endStates == null)){
+					combinedEndStates = combineArrays(endStates, combinedEndStates);
+					for(int a=0; a<endStates.size(); ++a){
+						if(this.epsilons.containsKey(endStates.get(a))){
+							combinedEndStates = combineArrays(this.epsilons.get(endStates.get(a)).get(this.alphabet[j]), endStates);
+						}
+					}
+				}
 			}
 
 			tempDFA = new DFAState(currentStarts, this.alphabet[j], combinedEndStates);
@@ -271,7 +299,14 @@ public class NFA{
 						//end states for this one letter and state, replace with each loop
 						//need to get state object from transFStates
 						oneEndStates = getFromHash(currentStarts.get(j), this.alphabet[i]);
-						if(!(oneEndStates == null)) combinedEndStates = combineArrays(oneEndStates, combinedEndStates);
+						if(!(oneEndStates == null)){
+							combinedEndStates = combineArrays(oneEndStates, combinedEndStates);
+							for(int a=0; a<oneEndStates.size(); ++a){
+								if(this.epsilons.containsKey(oneEndStates.get(a))){
+									combinedEndStates = combineArrays(this.epsilons.get(oneEndStates.get(a)).get(this.alphabet[i]), combinedEndStates);
+								}
+							}
+						}
 					}
 					//don't do this here
 					//formatFunctions(currentStarts, this.alphabet[i], combinedEndStates);
@@ -305,13 +340,16 @@ public class NFA{
 			returnString += (i == startStates.size()-1) ? (startStates.get(i)) : (startStates.get(i) + ", ");
 		}
 
-		returnString += ("} , " + letter + " = {");
+		returnString += ("} , " + letter + " = ");
 
+		//to replace {} with EM
+		String endStatesString = "{";
 		for(int i=0; i<endStates.size(); ++i){
-			returnString += (i == endStates.size()-1) ? (endStates.get(i)) : (endStates.get(i) + ", ");
+			endStatesString += (i == endStates.size()-1) ? (endStates.get(i)) : (endStates.get(i) + ", ");
 		}
 
-		return returnString+ "}";
+		if(endStatesString.equals("{")) return returnString + "EM";
+		return returnString+ endStatesString+ "}";
 	}
 
 
@@ -342,8 +380,11 @@ public class NFA{
 		for(int p=0; p<this.dfaStates.size(); ++p){
 			tempDFA = this.dfaStates.get(p);
 			t = formatFunctions(tempDFA.startStates, tempDFA.symbol, tempDFA.endStates);
-			print(t);
-			finalFunctions.add(t);
+			if(t.substring(0,2).equals("{}")){
+			}
+			else{
+				finalFunctions.add(t);
+			}
 		}
 	}
 
@@ -353,6 +394,46 @@ public class NFA{
 			if(!allCombined.contains(smallerSet.get(k))) allCombined.add(smallerSet.get(k));
 		}
 		return allCombined;
+	}
+
+
+	public void writeFile() throws IOException{
+		File fout = new File("output.DFA");
+		FileOutputStream fos = new FileOutputStream(fout);
+
+		BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(fos));
+
+		for(String s : this.states){
+			bw.write(s + "\t");
+		}
+		bw.newLine();
+
+		for(String a : this.alphabet){
+			bw.write(a + "\t");
+		}
+		bw.newLine();
+
+		String prime = "{";
+		for(int s=0; s< qPrime.size(); ++s){
+			prime += (s == qPrime.size()-1) ? qPrime.get(s) : (qPrime.get(s) + ",");
+		}
+		bw.write(prime + "}");
+		bw.newLine();
+
+		String accept = "{";
+		for(int s=0; s< acceptStates.length; ++s){
+			accept += (s == acceptStates.length-1) ? acceptStates[s] : (acceptStates[s] + ",");
+		}
+		bw.write(accept + "}");
+		bw.newLine();
+
+
+		for(String line : this.finalFunctions) {
+			bw.write(line);
+			bw.newLine();
+		}
+
+		bw.close();
 	}
 
 
