@@ -10,4 +10,14 @@ public class DFAState {
     this.endStates = endStates;
   }
 
+
+  public boolean equalToStart(ArrayList<Integer> find){
+    int matches = 0;
+    if(find.size() != startStates.size()) return false;
+    for(int g=0; g< find.size(); ++g){
+      if(startStates.contains(find.get(g))) matches++;
+    }
+    return matches == find.size();
+  }
+
 }

@@ -35,14 +35,15 @@ public class NFA{
 	public static void main(String[] args){
 
 		NFA ex = new NFA();
-		ex.readFile("nfa_example.nfa");
-		//ex.readFile("example.txt");
+		//ex.readFile("nfa_example.nfa");
+		ex.readFile("example.txt");
 
 		ex.convertToStates();
 		ex.getQPrime();
 		ex.acceptableStates();
 		ex.fillEmptySets();
 		ex.getEndStates();
+		print(ex.hmap);
 		ex.fillFinalStrings();
 
 	}
@@ -271,9 +272,6 @@ public class NFA{
 						//need to get state object from transFStates
 						oneEndStates = getFromHash(currentStarts.get(j), this.alphabet[i]);
 						if(!(oneEndStates == null)) combinedEndStates = combineArrays(oneEndStates, combinedEndStates);
-						print("");
-						printArray(combinedEndStates);
-						print("");
 					}
 					//don't do this here
 					//formatFunctions(currentStarts, this.alphabet[i], combinedEndStates);
@@ -295,13 +293,7 @@ public class NFA{
 
 		for(int h=0; h<this.dfaStates.size(); ++h){
 			tempDFA = this.dfaStates.get(h);
-			int matching = 0;
-			for(int starts : tempDFA.startStates){
-				if(find.contains(starts)) matching++;
-			}
-			//if all ints matched, return true
-			//else go to next dfa in list
-			if(matching == tempDFA.startStates.size()) return true;
+			if(tempDFA.equalToStart(find)) return true;
 		}
 		return false;
 	}
@@ -310,13 +302,13 @@ public class NFA{
 		String returnString = "{";
 
 		for(int i=0; i<startStates.size(); ++i){
-			returnString += (i == startStates.size()) ? (startStates.get(i)) : (startStates.get(i) + ", ");
+			returnString += (i == startStates.size()-1) ? (startStates.get(i)) : (startStates.get(i) + ", ");
 		}
 
 		returnString += ("} , " + letter + " = {");
 
 		for(int i=0; i<endStates.size(); ++i){
-			returnString += (endStates.get(i) + ", ");
+			returnString += (i == endStates.size()-1) ? (endStates.get(i)) : (endStates.get(i) + ", ");
 		}
 
 		return returnString+ "}";
