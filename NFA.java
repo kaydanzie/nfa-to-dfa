@@ -22,9 +22,7 @@ public class NFA{
 	//states have been stripped of non-numeric characters
 	//initialized in method acceptableStates:
 	HashMap<Integer, HashMap<String, ArrayList<Integer>>> hmap = new HashMap<Integer, HashMap<String, ArrayList<Integer>>>();
-
 	HashMap<Integer, HashMap<String, ArrayList<Integer>>> epsilons = new HashMap<Integer, HashMap<String, ArrayList<Integer>>>();
-
 
 	//initialized in method getQPrime:
 	ArrayList<Integer> qPrime = new ArrayList<>();
@@ -32,6 +30,7 @@ public class NFA{
 	//filled in getEndStates:
 	ArrayList<DFAState> dfaStates = new ArrayList<DFAState>();
 
+	//filled in fillFinalStrings:
 	ArrayList<String> finalFunctions = new ArrayList<String>();
 
 
@@ -49,7 +48,9 @@ public class NFA{
 		ex.getQPrime();
 		ex.acceptableStates();
 		ex.fillEmptySets();
+		print(ex.hmap);
 		ex.getEndStates();
+		print(ex.epsilons);
 		ex.fillFinalStrings();
 		ex.writeFile();
 
@@ -193,7 +194,7 @@ public class NFA{
 
 				}
 				else if((tempCurrent.current == Integer.parseInt(this.states[i])) && tempCurrent.symbol.equals("EPS")){
-					//if this doesnt work try initializing empty
+					//if this doesnt work try initializing empty for epsilons
 					if(epsilons.containsKey(tempStateNum)){
 						acceptedStates = this.epsilons.get(tempStateNum);
 					}
@@ -233,7 +234,7 @@ public class NFA{
 	public ArrayList<Integer> getFromHash(int s, String letter){
 		for(int i=0; i<this.states.length; ++i){
 			HashMap<String, ArrayList<Integer>> t = hmap.get(s);
-			if(t.get(letter) != null) return t.get(letter);
+			if(t.containsKey(letter)) return t.get(letter);
 			else return null;
 		}
 		return null;
@@ -241,46 +242,45 @@ public class NFA{
 
 	//given state and letter, get end states (arraylist)
 	public void getEndStates(){
+		//currentStarts = needed to make DFA object
 		ArrayList<Integer> combinedEndStates, currentStarts, oneEndStates;
 		DFAState tempDFA;
 
-		//start stack with qprime, pop end states, get end states of those, push them
-		for(int j=0; j<this.alphabet.length; ++j){
-			combinedEndStates = new ArrayList<Integer>();
-			currentStarts = new ArrayList<Integer>();
 
-			//for each letter, combine end states of q prime states
-			for(int k=0; k<this.qPrime.size(); ++k){
-				ArrayList<Integer> endStates;
-				if(this.epsilons.containsKey(this.qPrime.get(k))){
-					endStates = getFromHash(this.qPrime.get(k), this.alphabet[j]);
-					ArrayList<Integer> epsilonStates = this.epsilons.get(this.qPrime.get(k)).get(this.alphabet[j]);
-					if(endStates == null){
-						endStates = epsilonStates;
-					}
-					else{
-						endStates = combineArrays(epsilonStates, endStates);
-					}
-				}
-				else {
-					endStates = getFromHash(this.qPrime.get(k), this.alphabet[j]);
-				}
-				currentStarts.add(this.qPrime.get(k));
-				if(!(endStates == null)){
-					combinedEndStates = combineArrays(endStates, combinedEndStates);
-					for(int a=0; a<endStates.size(); ++a){
-						if(this.epsilons.containsKey(endStates.get(a))){
-							combinedEndStates = combineArrays(this.epsilons.get(endStates.get(a)).get(this.alphabet[j]), endStates);
-						}
-					}
+		for(int j=0; j<this.alphabet.length; ++j){
+
+			Stack<Integer> miniStack = new Stack<Integer>();
+			combinedEndStates = new ArrayList<Integer>();
+			ArrayList<Integer> oneState;
+
+			for(int k=0; k< this.qPrime.size(); ++k){
+				oneState = new ArrayList<Integer>();//initialize
+				oneState = combineArrays(getFromHash(this.qPrime.get(k), this.alphabet[j]), oneState);
+
+				if(!(oneState == null)){
+					combinedEndStates = combineArrays(oneState, combinedEndStates);
 				}
 			}
 
-			tempDFA = new DFAState(currentStarts, this.alphabet[j], combinedEndStates);
-			//each letter gets pushed, after iterating through all q prime states
-			this.endStack.push(combinedEndStates);
-		}
+			//need to check end states for eps closures
+			//use stack bc combinedEndStates array keeps changing and can't add/remove in loop
+			miniStack = pushToStack(combinedEndStates, miniStack);
 
+			while(!miniStack.empty()){
+				int t = miniStack.pop();
+
+				if(this.epsilons.containsKey(t)){
+					combinedEndStates = combineArrays(epsilons.get(t).get(this.alphabet[j]), combinedEndStates);
+					for(int x : epsilons.get(t).get(this.alphabet[j])) miniStack.push(x);
+				}
+			}
+
+			tempDFA = new DFAState(this.qPrime, this.alphabet[j], combinedEndStates);
+			dfaStates.add(tempDFA);
+
+			endStack.push(combinedEndStates);
+
+		}
 
 		//stack of end states, which then used as start states
 		while(!endStack.empty()){
@@ -308,17 +308,12 @@ public class NFA{
 							}
 						}
 					}
-					//don't do this here
-					//formatFunctions(currentStarts, this.alphabet[i], combinedEndStates);
 					tempDFA = new DFAState(currentStarts, this.alphabet[i], combinedEndStates);
 					dfaStates.add(tempDFA);
 					this.endStack.push(combinedEndStates);
 				}
-
 			}
 			//else start states have already been checked
-
-
 		}
 	}
 
@@ -383,6 +378,7 @@ public class NFA{
 			if(t.substring(0,2).equals("{}")){
 			}
 			else{
+				print(t);
 				finalFunctions.add(t);
 			}
 		}
@@ -390,10 +386,20 @@ public class NFA{
 
 
 	public ArrayList<Integer> combineArrays(ArrayList<Integer> smallerSet, ArrayList<Integer> allCombined){
+		if(smallerSet == null) return allCombined;
+		else if(allCombined == null) return smallerSet;
 		for(int k=0; k<smallerSet.size(); ++k){
 			if(!allCombined.contains(smallerSet.get(k))) allCombined.add(smallerSet.get(k));
 		}
 		return allCombined;
+	}
+
+
+	public Stack<Integer> pushToStack(ArrayList<Integer> arr, Stack<Integer> s){
+		for(int a : arr){
+			s.push(a);
+		}
+		return s;
 	}
 
 

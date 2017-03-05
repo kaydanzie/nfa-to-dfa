@@ -7,3 +7,5 @@ Write a Java program that takes the specification for a non-deterministic finite
 <li>Line 4: Set of accept states</li>
 <li>Line 5 to EOF: Transition function</li>
 </ul>
+
+Assignment specifications from Dr. Erik Linstead
