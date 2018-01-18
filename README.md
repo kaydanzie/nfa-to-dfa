@@ -1,4 +1,4 @@
-#NFA to DFA
+# NFA to DFA
 Write a Java program that takes the specification for a non-deterministic finite automaton (NFA) as input and outputs the specification for an equivalent deterministic finite automaton (DFA).The NFA input specification will be passed as a command line argument and be of the following form:
 <ul>
 <li>Line 1: A list of states</li>
